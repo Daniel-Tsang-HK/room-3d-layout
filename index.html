@@ -6587,6 +6587,40 @@ function makeDeskSupportPanel(panelW, panelH, panelT, holeW, holeH, radius, mat,
   return mesh;
 }
 
+
+/* ===== 抽屜／櫃門共用外觀：黑色圍邊 + 手指斜角（取代拉手） ===== */
+const frontTrimMat = new THREE.MeshStandardMaterial({color: 0x14161a, roughness: 0.55, metalness: 0.25});
+function makeFrontPanel(w, h, t, bev, edge, mat, tag, extra) {
+  const g = new THREE.Group();
+  // 黑色圍邊：比面板略大的深色底板，露出 8mm 邊框
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 1.6, h + 1.6, Math.max(0.5, t - 0.4)), frontTrimMat);
+  trim.castShadow = true; trim.receiveShadow = true;
+  g.add(trim);
+  // 面板本體（正面 +z）
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), mat);
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  // 手指斜角：45° 斜切條，取代拉手
+  let bevMesh;
+  if (edge === 'top') {
+    bevMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 1, bev, bev), mat);
+    bevMesh.rotation.x = Math.PI / 4;
+    bevMesh.position.set(0, h / 2, t / 2);
+  } else {
+    const sx = edge === 'right' ? 1 : -1;
+    bevMesh = new THREE.Mesh(new THREE.BoxGeometry(bev, h - 1, bev), mat);
+    bevMesh.rotation.y = Math.PI / 4;
+    bevMesh.position.set(sx * w / 2, 0, t / 2);
+  }
+  bevMesh.castShadow = true;
+  g.add(bevMesh);
+  g.children.forEach(c => {
+    c.userData.clickable = tag;
+    if (extra) Object.assign(c.userData, extra);
+  });
+  return g;
+}
+
 function build() {
   while (G.children.length) G.remove(G.children[0]);
   measureGroup = new THREE.Group();
@@ -6755,11 +6789,8 @@ function build() {
     const pivot = new THREE.Group();
     pivot.position.set(cx, bdY, bedFrontZ);
     G.add(pivot);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(bdW, bdH, bdPanelT), storageMat);
+    const panel = makeFrontPanel(bdW, bdH, bdPanelT, 1.2, 'top', storageMat, 'bedDrawer', {bedDrawerIdx: i});
     panel.position.set(0, 0, bdPanelT / 2);
-    panel.castShadow = true;
-    panel.userData.clickable = 'bedDrawer';
-    panel.userData.bedDrawerIdx = i;
     pivot.add(panel);
     const innerW = bdW - 4, innerH = bdH - 4;
     const bottom = new THREE.Mesh(new THREE.BoxGeometry(innerW, 2, bdD), storageInnerMat);
@@ -6770,10 +6801,6 @@ function build() {
     sideR.position.set(innerW / 2 - 1, 0, -bdD / 2); sideR.castShadow = true; pivot.add(sideR);
     const back = new THREE.Mesh(new THREE.BoxGeometry(innerW, innerH, 2), storageInnerMat);
     back.position.set(0, 0, -bdD + 1); back.castShadow = true; pivot.add(back);
-    const hdl = new THREE.Mesh(new THREE.BoxGeometry(bdW * 0.5, 3, 2), handleMat);
-    hdl.position.set(0, 0, bdPanelT + 1.5); hdl.castShadow = true;
-    hdl.userData.clickable = 'bedDrawer'; hdl.userData.bedDrawerIdx = i;
-    pivot.add(hdl);
     markMeasurable(pivot);
     bedDrawers.push({pivot, open: false, closedZ: bedFrontZ, travel: 35});
   });
@@ -6819,9 +6846,9 @@ function build() {
   storageGlassLPivot = new THREE.Group();
   storageGlassLPivot.position.set(gdX, gdY, sBack);
   G.add(storageGlassLPivot);
-  const gdLPanel = new THREE.Mesh(new THREE.BoxGeometry(gdT, gdH, gdHalfD), storageMat);
+  const gdLPanel = makeFrontPanel(gdHalfD, gdH, gdT, 1.2, 'left', storageMat, 'storageGlassL');
+  gdLPanel.rotation.y = Math.PI / 2;
   gdLPanel.position.set(0, 0, gdHalfD / 2);
-  gdLPanel.userData.clickable = 'storageGlassL';
   storageGlassLPivot.add(gdLPanel);
   [[0, gdH/2 - gfT/2, gdHalfD/2, gdT+0.6, gfT, gdHalfD],
    [0, -gdH/2 + gfT/2, gdHalfD/2, gdT+0.6, gfT, gdHalfD],
@@ -6831,18 +6858,14 @@ function build() {
     fm.userData.clickable = 'storageGlassL';
     storageGlassLPivot.add(fm);
   });
-  const gdLHandle = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-  gdLHandle.position.set(gdT / 2 + 1, 0, gdHalfD - 6); gdLHandle.castShadow = true;
-  gdLHandle.userData.clickable = 'storageGlassL';
-  storageGlassLPivot.add(gdLHandle);
   markMeasurable(storageGlassLPivot);
 
   storageGlassRPivot = new THREE.Group();
   storageGlassRPivot.position.set(gdX, gdY, sFront);
   G.add(storageGlassRPivot);
-  const gdRPanel = new THREE.Mesh(new THREE.BoxGeometry(gdT, gdH, gdHalfD), storageMat);
+  const gdRPanel = makeFrontPanel(gdHalfD, gdH, gdT, 1.2, 'right', storageMat, 'storageGlassR');
+  gdRPanel.rotation.y = Math.PI / 2;
   gdRPanel.position.set(0, 0, -gdHalfD / 2);
-  gdRPanel.userData.clickable = 'storageGlassR';
   storageGlassRPivot.add(gdRPanel);
   [[0, gdH/2 - gfT/2, -gdHalfD/2, gdT+0.6, gfT, gdHalfD],
    [0, -gdH/2 + gfT/2, -gdHalfD/2, gdT+0.6, gfT, gdHalfD],
@@ -6852,10 +6875,6 @@ function build() {
     fm.userData.clickable = 'storageGlassR';
     storageGlassRPivot.add(fm);
   });
-  const gdRHandle = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-  gdRHandle.position.set(gdT / 2 + 1, 0, -gdHalfD + 6); gdRHandle.castShadow = true;
-  gdRHandle.userData.clickable = 'storageGlassR';
-  storageGlassRPivot.add(gdRHandle);
   markMeasurable(storageGlassRPivot);
 
   const drW = storageW - 4, drD = 70;
@@ -6866,10 +6885,8 @@ function build() {
   storageDrawerPivot.position.set(storageX, drY, storageDrawerClosedZ);
   G.add(storageDrawerPivot);
 
-  const drFront = new THREE.Mesh(new THREE.BoxGeometry(drW, drH, 2), storageMat);
+  const drFront = makeFrontPanel(drW, drH, 2, 1.2, 'top', storageMat, 'storageDrawer');
   drFront.position.set(0, 0, -1);
-  drFront.castShadow = true;
-  drFront.userData.clickable = 'storageDrawer';
   storageDrawerPivot.add(drFront);
 
   const drBoxW = drW - 4, drBoxH = drH - 4, drBoxFrontZ = -2, drBoxCz = drBoxFrontZ - drD / 2;
@@ -6881,9 +6898,6 @@ function build() {
   drRight.position.set(drBoxW / 2 - 1, 0, drBoxCz); drRight.castShadow = true; storageDrawerPivot.add(drRight);
   const drBack = new THREE.Mesh(new THREE.BoxGeometry(drBoxW, drBoxH, 2), storageInnerMat);
   drBack.position.set(0, 0, drBoxFrontZ - drD + 1); drBack.castShadow = true; storageDrawerPivot.add(drBack);
-  const drHandle = new THREE.Mesh(new THREE.BoxGeometry(drW * 0.5, 3, 2), handleMat);
-  drHandle.position.set(0, 0, 1); drHandle.castShadow = true; drHandle.userData.clickable = 'storageDrawer';
-  storageDrawerPivot.add(drHandle);
   markMeasurable(storageDrawerPivot);
 
   const shelfT = 1.5, shelfDepth = 15, shelfLen = storageD;
@@ -6932,17 +6946,10 @@ function build() {
     pivot.position.set(wardDoorX, d.y, wardrobeZ + wardDoorD / 2);
     G.add(pivot);
     wardDoorPivots.push(pivot);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(wardDoorT, d.h, wardDoorD), storageMat);
+    const panel = makeFrontPanel(wardDoorD, d.h, wardDoorT, 1.2, 'left', storageMat, 'wardDoor', {wardDoorIdx: i});
+    panel.rotation.y = -Math.PI / 2;
     panel.position.set(0, 0, -wardDoorD / 2);
-    panel.castShadow = true; panel.receiveShadow = true;
-    panel.userData.clickable = 'wardDoor';
-    panel.userData.wardDoorIdx = i;
     pivot.add(panel);
-    const hdl = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-    hdl.position.set(-1, 0, -wardDoorD + 8); hdl.castShadow = true;
-    hdl.userData.clickable = 'wardDoor';
-    hdl.userData.wardDoorIdx = i;
-    pivot.add(hdl);
     markMeasurable(pivot);
   });
 
@@ -7009,10 +7016,9 @@ function build() {
   dskDr.position.set(0, 0, 0);
   G.add(dskDr);
   deskDrawer = dskDr;
-  const dskDrFront = new THREE.Mesh(new THREE.BoxGeometry(2, dskDrH, dskDrW), deskMat);
+  const dskDrFront = makeFrontPanel(dskDrW, dskDrH, 2, 1.2, 'top', deskMat, 'deskDrawer');
+  dskDrFront.rotation.y = -Math.PI / 2;
   dskDrFront.position.set((dskDrX1 + dskDrX2) / 2, dskDrYc, dskDrZc);
-  dskDrFront.castShadow = true; dskDrFront.receiveShadow = true;
-  dskDrFront.userData.clickable = 'deskDrawer';
   dskDr.add(dskDrFront);
   const dskDrBottom = new THREE.Mesh(new THREE.BoxGeometry(dskDrD - 2, 1.5, dskDrW - 4), deskMat);
   dskDrBottom.position.set(dskDrX2 + dskDrD / 2, dskDrBotY + 0.75, dskDrZc);
@@ -7028,11 +7034,6 @@ function build() {
   dskDrBack.position.set(dskDrBackX - 0.75, dskDrBotY + 1.5 + (dskDrH - 1.5) / 2, dskDrZc);
   dskDrBack.castShadow = true; dskDrBack.receiveShadow = true;
   dskDr.add(dskDrBack);
-  const dskDrHandle = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, dskDrW * 0.5), handleMat);
-  dskDrHandle.position.set(dskDrX1 - 0.75, dskDrYc, dskDrZc);
-  dskDrHandle.castShadow = true;
-  dskDrHandle.userData.clickable = 'deskDrawer';
-  dskDr.add(dskDrHandle);
   // 拉軌：貼在桌底（y 790–810mm），在抽屜兩側外緣，與穿線孔 z 245–295mm 無衝突
   [dskDrZ1 + 0.5, dskDrZ2 - 0.5].forEach(zEdge => {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(dskDrD, 2, 1.5), brkMat);
@@ -7452,16 +7453,10 @@ function build() {
   bcWoodDoorPivot = new THREE.Group();
   bcWoodDoorPivot.position.set(bcAx1, bcCy, bcAz1);
   G.add(bcWoodDoorPivot);
-  const bcWoodPanel = new THREE.Mesh(new THREE.BoxGeometry(bcWoodDoorT, bcWoodDoorH, bcWoodDoorW), storageMat);
+  const bcWoodPanel = makeFrontPanel(bcWoodDoorW, bcWoodDoorH, bcWoodDoorT, 1.2, 'left', storageMat, 'bcWoodDoor');
+  bcWoodPanel.rotation.y = Math.PI / 2;
   bcWoodPanel.position.set(bcWoodDoorT / 2, 0, bcWoodDoorW / 2);
-  bcWoodPanel.castShadow = true;
-  bcWoodPanel.userData.clickable = 'bcWoodDoor';
   bcWoodDoorPivot.add(bcWoodPanel);
-  const bcWoodHandle = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-  bcWoodHandle.position.set(-1, 0, bcWoodDoorW - 6);
-  bcWoodHandle.castShadow = true;
-  bcWoodHandle.userData.clickable = 'bcWoodDoor';
-  bcWoodDoorPivot.add(bcWoodHandle);
   markMeasurable(bcWoodDoorPivot);
 
   const bcGlassDoorT = 1.5, bcGlassDoorH = bcH - 4, bcGlassHalfW = bcBLen / 2 - bcT, bcgT = 1.5;
@@ -7484,11 +7479,6 @@ function build() {
     fm.userData.clickable = 'bcGlassL';
     bcGlassLPivot.add(fm);
   });
-  const bcGlassLHandle = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-  bcGlassLHandle.position.set(bcGlassHalfW / 2 - 6, 0, bcGlassDoorT + 1);
-  bcGlassLHandle.castShadow = true;
-  bcGlassLHandle.userData.clickable = 'bcGlassL';
-  bcGlassLPivot.add(bcGlassLHandle);
   markMeasurable(bcGlassLPivot);
 
   bcGlassRClosedX = bcBx2 - bcT - bcGlassHalfW / 2;
@@ -7508,11 +7498,6 @@ function build() {
     fm.userData.clickable = 'bcGlassR';
     bcGlassRPivot.add(fm);
   });
-  const bcGlassRHandle = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), handleMat);
-  bcGlassRHandle.position.set(-bcGlassHalfW / 2 + 6, 0, bcGlassDoorT + 1);
-  bcGlassRHandle.castShadow = true;
-  bcGlassRHandle.userData.clickable = 'bcGlassR';
-  bcGlassRPivot.add(bcGlassRHandle);
   markMeasurable(bcGlassRPivot);
 
   /* ===== 亞克力書立架（透明藍，放於打印機與衣櫃之間） ===== */
