@@ -6588,32 +6588,41 @@ function makeDeskSupportPanel(panelW, panelH, panelT, holeW, holeH, radius, mat,
 }
 
 
-/* ===== 抽屜／櫃門共用外觀：黑色圍邊 + 手指斜角（取代拉手） ===== */
+/* ===== 抽屜／櫃門共用外觀：黑色圍邊（邊緣本身做斜角，斜向櫃內） ===== */
 const frontTrimMat = new THREE.MeshStandardMaterial({color: 0x14161a, roughness: 0.55, metalness: 0.25});
+// 在局部座標（X=寬、Y=高、Z=厚，正面 +Z）產生「邊緣倒斜角」的實體
+function chamferBoxGeo(W, H, T, b, edge) {
+  const shape = new THREE.Shape();
+  let geo;
+  if (edge === 'top') {
+    // 剖面 (a=厚度, v=高度)，正面 a=T，斜角在頂邊、向內退
+    shape.moveTo(0, 0); shape.lineTo(T, 0); shape.lineTo(T, H - b); shape.lineTo(T - b, H); shape.lineTo(0, H); shape.closePath();
+    geo = new THREE.ExtrudeGeometry(shape, {depth: W, bevelEnabled: false});
+    geo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, W / 2, 0, 1, 0, -H / 2, 1, 0, 0, -T / 2, 0, 0, 0, 1));
+  } else {
+    // 剖面 (a=厚度, v=寬度)，擠出高度；斜角在開邊一側、向內退
+    if (edge === 'right') {
+      shape.moveTo(0, 0); shape.lineTo(T, 0); shape.lineTo(T, W - b); shape.lineTo(T - b, W); shape.lineTo(0, W); shape.closePath();
+    } else {
+      shape.moveTo(0, 0); shape.lineTo(T - b, 0); shape.lineTo(T, b); shape.lineTo(T, W); shape.lineTo(0, W); shape.closePath();
+    }
+    geo = new THREE.ExtrudeGeometry(shape, {depth: H, bevelEnabled: false});
+    geo.applyMatrix4(new THREE.Matrix4().set(0, 1, 0, -W / 2, 0, 0, 1, -H / 2, 1, 0, 0, -T / 2, 0, 0, 0, 1));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+// 面板＋黑色圍邊：圍邊比面板每邊大 8mm，斜角做在圍邊邊緣上；面板略後退露出黑邊
 function makeFrontPanel(w, h, t, bev, edge, mat, tag, extra) {
+  const m = 0.8;
   const g = new THREE.Group();
-  // 黑色圍邊：比面板略大的深色底板，露出 8mm 邊框
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 1.6, h + 1.6, Math.max(0.5, t - 0.4)), frontTrimMat);
+  const trim = new THREE.Mesh(chamferBoxGeo(w + 2 * m, h + 2 * m, t, bev, edge), frontTrimMat);
+  trim.position.z = -0.8;
   trim.castShadow = true; trim.receiveShadow = true;
   g.add(trim);
-  // 面板本體（正面 +z）
   const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), mat);
   body.castShadow = true; body.receiveShadow = true;
   g.add(body);
-  // 手指斜角：45° 斜切條，取代拉手
-  let bevMesh;
-  if (edge === 'top') {
-    bevMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 1, bev, bev), mat);
-    bevMesh.rotation.x = Math.PI / 4;
-    bevMesh.position.set(0, h / 2, t / 2);
-  } else {
-    const sx = edge === 'right' ? 1 : -1;
-    bevMesh = new THREE.Mesh(new THREE.BoxGeometry(bev, h - 1, bev), mat);
-    bevMesh.rotation.y = Math.PI / 4;
-    bevMesh.position.set(sx * w / 2, 0, t / 2);
-  }
-  bevMesh.castShadow = true;
-  g.add(bevMesh);
   g.children.forEach(c => {
     c.userData.clickable = tag;
     if (extra) Object.assign(c.userData, extra);
