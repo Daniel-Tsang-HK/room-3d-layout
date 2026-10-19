@@ -6612,17 +6612,13 @@ function chamferBoxGeo(W, H, T, b, edge) {
   geo.computeVertexNormals();
   return geo;
 }
-// 面板＋黑色圍邊：圍邊比面板每邊大 8mm，斜角做在圍邊邊緣上；面板略後退露出黑邊
+// 面板：正面白色，四周邊緣（含斜切面）為黑色封邊；斜角做在面板邊緣本身
 function makeFrontPanel(w, h, t, bev, edge, mat, tag, extra) {
-  const m = 0.8;
   const g = new THREE.Group();
-  const trim = new THREE.Mesh(chamferBoxGeo(w + 2 * m, h + 2 * m, t, bev, edge), frontTrimMat);
-  trim.position.z = -0.8;
-  trim.castShadow = true; trim.receiveShadow = true;
-  g.add(trim);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), mat);
-  body.castShadow = true; body.receiveShadow = true;
-  g.add(body);
+  // ExtrudeGeometry：materialIndex 0 = 前後大面、1 = 四周側面（含斜切面）
+  const mesh = new THREE.Mesh(chamferBoxGeo(w, h, t, bev, edge), [frontTrimMat, mat]);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  g.add(mesh);
   g.children.forEach(c => {
     c.userData.clickable = tag;
     if (extra) Object.assign(c.userData, extra);
