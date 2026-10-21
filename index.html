@@ -7097,6 +7097,10 @@ function build() {
       wheel.rotation.z = Math.PI / 2;
       wheel.castShadow = true; chair.add(wheel);
     }
+    // 中央底座（連接五爪，避免看起來懸空）
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.8, 5, 16), black);
+    hub.position.set(0, 3.4, 0);
+    hub.castShadow = true; chair.add(hub);
     // 氣壓柱
     const post = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 34, 16), metal);
     post.position.set(0, 22, 0); post.castShadow = true; chair.add(post);
@@ -7113,13 +7117,13 @@ function build() {
       const armrest = new THREE.Mesh(new RoundedBoxGeometry(5, 3, 28, 2, 1.2), black);
       armrest.position.set(s * 24, 63, -2);
       armrest.castShadow = true; chair.add(armrest);
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(3.4, 9, 3.4), metal);
-      stem.position.set(s * 24, 58, -2);
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(3.4, 17, 3.4), metal);
+      stem.position.set(s * 24, 53.5, -2);
       stem.castShadow = true; chair.add(stem);
     });
     // 椅背支架
-    const stem2 = new THREE.Mesh(new THREE.BoxGeometry(4, 14, 4), metal);
-    stem2.position.set(0, 54, -20); stem2.castShadow = true; chair.add(stem2);
+    const stem2 = new THREE.Mesh(new THREE.BoxGeometry(4, 16, 4), metal);
+    stem2.position.set(0, 53, -20); stem2.castShadow = true; chair.add(stem2);
     G.add(chair);
     otherObjects.push(chair);
     markMeasurable(chair);
