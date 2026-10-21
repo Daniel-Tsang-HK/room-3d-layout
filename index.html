@@ -1976,7 +1976,7 @@ gl_Position = projectionMatrix * mvPosition;`,X0=`#ifdef DITHERING
 			planar.x = v.x + 2.0 * signY + 2.0;
 			planar.y = v.z * signY - 2.0;
 		}
-		return vec2( 0.125, 0.25 ) * planar + vec2( 0.375, 0.75 );
+		return vec2( 0.25, 0.25 ) * planar + vec2( 0.375, 0.75 );
 	}
 	float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {
 		float shadow = 1.0;
@@ -2197,7 +2197,7 @@ vec3 ACESFilmicToneMapping( vec3 color ) {
 	return saturate( color );
 }
 const mat3 LINEAR_REC2020_TO_LINEAR_SRGB = mat3(
-	vec3( 1.6605, - 0.1246, - 0.0182 ),
+	vec3( 1.6605, - 0.246, - 0.0182 ),
 	vec3( - 0.5876, 1.1329, - 0.1006 ),
 	vec3( - 0.0728, - 0.0083, 1.1187 )
 );
@@ -6100,7 +6100,7 @@ const acm = M(0x9099a5);
 const acUnitMat = SM(0xc8d0d8, 0.45, 0.25);
 const skirtingMat = M(0x6f4a2b, 0.6);
 const handleMat = new THREE.MeshStandardMaterial({color: 0x9E9E9E, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.3});
-const glassMat = new THREE.MeshStandardMaterial({color: 0xa8d8f0, roughness: 0.12, metalness: 0.08, transparent: true, opacity: 0.4, side: THREE.DoubleSide});
+const glassMat = new THREE.MeshStandardMaterial({color: 0xa8d8f0, roughness: 0.2, metalness: 0.08, transparent: true, opacity: 0.4, side: THREE.DoubleSide});
 
 function box(n, x, y, z, w, h, d, m, parent = G) {
   const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -6595,9 +6595,13 @@ const frontTrimMat = new THREE.MeshStandardMaterial({color: 0x14161a, roughness:
 function chamferBoxGeo(W, H, T, b, edge) {
   const shape = new THREE.Shape();
   let geo;
-  if (edge === 'top') {
+  if (edge === 'top' || edge === 'bottom') {
     // 剖面 (a=厚度, v=高度)，正面 a=T；背面 a=0 側切角
-    shape.moveTo(0, 0); shape.lineTo(0, H - b); shape.lineTo(b, H); shape.lineTo(T, H); shape.lineTo(T, 0); shape.closePath();
+    if (edge === 'top') {
+      shape.moveTo(0, 0); shape.lineTo(0, H - b); shape.lineTo(b, H); shape.lineTo(T, H); shape.lineTo(T, 0); shape.closePath();
+    } else {
+      shape.moveTo(0, b); shape.lineTo(b, 0); shape.lineTo(T, 0); shape.lineTo(T, H); shape.lineTo(0, H); shape.closePath();
+    }
     geo = new THREE.ExtrudeGeometry(shape, {depth: W, bevelEnabled: false});
     geo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, W / 2, 0, 1, 0, -H / 2, 1, 0, 0, -T / 2, 0, 0, 0, 1));
   } else {
@@ -6615,31 +6619,47 @@ function chamferBoxGeo(W, H, T, b, edge) {
 }
 // 面板：白色正面、側邊（板厚 20mm 那一圈，含斜切面）全部黑色封邊
 function makeFrontPanel(w, h, t, bev, edge, mat, tag, extra) {
+  // 面板本體：正面／內側白色，四周側面黑色
   const g = new THREE.Group();
-  const body = new THREE.Mesh(chamferBoxGeo(w, h, t, bev, edge), mat);
-  body.castShadow = true; body.receiveShadow = true;
-  g.add(body);
-  const m = 0.2;                 // 2mm 封邊膠條
-  const bb = bev * Math.SQRT2;   // 斜邊面寬
-  const addBar = (bw, bh, bd) => {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), frontTrimMat);
-    bar.castShadow = true; g.add(bar); return bar;
-  };
-  if (edge === 'top') {
-    addBar(w + m, m, t + m).position.set(0, -h / 2, 0);           // 下邊
-    addBar(m, h + m, t + m).position.set(-w / 2, 0, 0);           // 左邊
-    addBar(m, h + m, t + m).position.set(w / 2, 0, 0);            // 右邊
-    const b = addBar(w + m, bb + m, m);                           // 斜邊膠條（沿斜面）
-    b.rotation.x = Math.PI / 4;
-    b.position.set(0, h / 2 - bev / 2, -t / 2 + bev / 2);
+  const mesh = new THREE.Mesh(chamferBoxGeo(w, h, t, bev, edge), [frontTrimMat, mat]);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  g.add(mesh);
+  // 上邊面（面 3）：黑色薄片覆蓋（斜切在背側時，上邊剩餘面為 z ∈ [-t/2+bev, t/2]）
+  if (edge === 'top' || edge === 'bottom') {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.2, t - bev), frontTrimMat);
+    slab.position.set(0, edge === 'top' ? h / 2 : -h / 2, bev / 2);
+    slab.castShadow = true;
+    g.add(slab);
+  }
+  // 斜邊在下方時，上橫邊亦為黑色
+  if (edge === 'bottom') {
+    const topSlab = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.2, t + 0.2), frontTrimMat);
+    topSlab.position.set(0, h / 2, 0);
+    topSlab.castShadow = true;
+    g.add(topSlab);
+  }
+  // 左／右斜邊：該側剩餘邊面（z ∈ [-t/2+bev, t/2]）亦為黑色
+  if (edge === 'left' || edge === 'right') {
+    const sx = edge === 'right' ? 1 : -1;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(0.2, h + 0.2, t - bev), frontTrimMat);
+    slab.position.set(sx * (w / 2), 0, bev / 2);
+    slab.castShadow = true;
+    g.add(slab);
+  }
+  // 斜切面：另加一片黑色薄板貼在斜面上，確保斜面為黑色（不影響內外兩面）
+  const bb = bev * Math.SQRT2;
+  const mk = (geoW, geoH) => new THREE.Mesh(new THREE.BoxGeometry(geoW, geoH, 0.06), frontTrimMat);
+  if (edge === 'top' || edge === 'bottom') {
+    const s = mk(w + 0.02, bb);
+    s.rotation.x = Math.PI / 4;
+    s.position.set(0, edge === 'top' ? (h / 2 - bev / 2) : (-h / 2 + bev / 2), -t / 2 + bev / 2);
+    s.castShadow = true; g.add(s);
   } else {
     const sx = edge === 'right' ? 1 : -1;
-    addBar(w + m, m, t + m).position.set(0, h / 2, 0);            // 上邊
-    addBar(w + m, m, t + m).position.set(0, -h / 2, 0);           // 下邊
-    addBar(m, h + m, t + m).position.set(-sx * w / 2, 0, 0);      // 鉸鏈邊
-    const b = addBar(bb + m, h + m, m);                           // 斜邊膠條
-    b.rotation.y = -sx * Math.PI / 4;
-    b.position.set(sx * (w / 2 - bev / 2), 0, -t / 2 + bev / 2);
+    const s = mk(bb, h + 0.02);
+    s.rotation.y = -sx * Math.PI / 4;
+    s.position.set(sx * (w / 2 - bev / 2), 0, -t / 2 + bev / 2);
+    s.castShadow = true; g.add(s);
   }
   g.children.forEach(c => {
     c.userData.clickable = tag;
@@ -6855,53 +6875,39 @@ function build() {
   const sBaseX = storageX + sInset / 2, sBaseZ = storageZ + sInset / 2;
   mbox('storage kick plate', sBaseX, skirtingH / 2, sBaseZ, sBaseW, skirtingH, sBaseD, storageMat);
 
-  mbox('storage top', storageX, storageH - sT / 2, storageZ, storageW, sT, storageD, storageMat);
+  mbox('storage top', storageX - 1, storageH - sT / 2, storageZ, storageW - 2, sT, storageD, storageMat);
   mbox('storage back', storageX, (skirtingH + storageH - sT) / 2, sBack + sT / 2, storageW - 2 * sT, storageH - sT - skirtingH, sT, storageMat);
   mbox('storage left', storageX - storageW / 2 + sT / 2, (10.5 + storageH - sT) / 2, storageZ, sT, storageH - sT - 10.5, storageD, storageMat);
   mbox('storage right lower', sRight - sT / 2, storageLowerPanelTop / 2, storageZ, sT, storageLowerPanelTop, storageD - 2 * sT, storageMat);
   const upperFrontH = (storageH - sT) - storageLowerPanelTop;
-  mbox('storage front upper', storageX, storageLowerPanelTop + upperFrontH / 2, sFront - sT / 2, storageW - 2 * sT, upperFrontH, sT, storageMat);
+  mbox('storage front upper', storageX, storageLowerPanelTop + upperFrontH / 2, sFront - sT / 2 - 0.6, storageW - 2 * sT, upperFrontH, sT, storageMat);
   box('storage shelf mid', storageX, storageLowerH + sT / 2, storageZ, storageW - 2 * sT, sT, storageD - 2 * sT, storageInnerMat);
   box('storage shelf upper', storageX, 94, storageZ, storageW - 2 * sT, sT, storageD - 2 * sT, storageInnerMat);
   box('storage shelf upper2', storageX, 125, storageZ, storageW - 2 * sT, sT, storageD - 2 * sT, storageInnerMat);
 
-  const gdT = 1.5, gdBot = storageLowerPanelTop, gdTop = storageH - sT;
+  const gdT = 1.5, gdBot = storageLowerPanelTop, gdTop = storageH - 0.1;
   const gdH = gdTop - gdBot, gdY = (gdTop + gdBot) / 2;
-  const gdD = storageD, gdHalfD = gdD / 2, gdX = sRight - gdT / 2;
+  const gdD = storageD, gdHalfD = gdD / 2, gdX = sRight - gdT / 2 - 0.02;
   const gfT = 1.5;
 
   storageGlassLPivot = new THREE.Group();
   storageGlassLPivot.position.set(gdX, gdY, sBack);
   G.add(storageGlassLPivot);
-  const gdLPanel = makeFrontPanel(gdHalfD, gdH, gdT, 1.2, 'left', storageMat, 'storageGlassL');
+  const gdLPanel = makeFrontPanel(gdHalfD - 0.15, gdH, gdT, 1.2, 'top', storageMat, 'storageGlassL');
   gdLPanel.rotation.y = Math.PI / 2;
-  gdLPanel.position.set(0, 0, gdHalfD / 2);
+  gdLPanel.position.set(0, 0, gdHalfD / 2 - 0.15);
   storageGlassLPivot.add(gdLPanel);
-  [[0, gdH/2 - gfT/2, gdHalfD/2, gdT+0.6, gfT, gdHalfD],
-   [0, -gdH/2 + gfT/2, gdHalfD/2, gdT+0.6, gfT, gdHalfD],
-   [0, 0, gdHalfD - gfT/2, gdT+0.6, gdH, gfT]].forEach(([fx, fy, fz, fw, fh, fd]) => {
-    const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fd), storageMat);
-    fm.position.set(fx, fy, fz); fm.castShadow = true;
-    fm.userData.clickable = 'storageGlassL';
-    storageGlassLPivot.add(fm);
-  });
+  // 實木門：不再加玻璃門框
   markMeasurable(storageGlassLPivot);
 
   storageGlassRPivot = new THREE.Group();
   storageGlassRPivot.position.set(gdX, gdY, sFront);
   G.add(storageGlassRPivot);
-  const gdRPanel = makeFrontPanel(gdHalfD, gdH, gdT, 1.2, 'right', storageMat, 'storageGlassR');
+  const gdRPanel = makeFrontPanel(gdHalfD - 0.15, gdH, gdT, 1.2, 'top', storageMat, 'storageGlassR');
   gdRPanel.rotation.y = Math.PI / 2;
-  gdRPanel.position.set(0, 0, -gdHalfD / 2);
+  gdRPanel.position.set(0, 0, -gdHalfD / 2 + 0.15);
   storageGlassRPivot.add(gdRPanel);
-  [[0, gdH/2 - gfT/2, -gdHalfD/2, gdT+0.6, gfT, gdHalfD],
-   [0, -gdH/2 + gfT/2, -gdHalfD/2, gdT+0.6, gfT, gdHalfD],
-   [0, 0, -gdHalfD + gfT/2, gdT+0.6, gdH, gfT]].forEach(([fx, fy, fz, fw, fh, fd]) => {
-    const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fd), storageMat);
-    fm.position.set(fx, fy, fz); fm.castShadow = true;
-    fm.userData.clickable = 'storageGlassR';
-    storageGlassRPivot.add(fm);
-  });
+  // 實木門：不再加玻璃門框
   markMeasurable(storageGlassRPivot);
 
   const drW = storageW - 4, drD = 70;
@@ -6913,10 +6919,10 @@ function build() {
   G.add(storageDrawerPivot);
 
   const drFront = makeFrontPanel(drW, drH, 2, 1.2, 'top', storageMat, 'storageDrawer');
-  drFront.position.set(0, 0, -1);
+  drFront.position.set(0, 0, 0.5);
   storageDrawerPivot.add(drFront);
 
-  const drBoxW = drW - 4, drBoxH = drH - 4, drBoxFrontZ = -2, drBoxCz = drBoxFrontZ - drD / 2;
+  const drBoxW = drW - 4, drBoxH = drH - 4, drBoxFrontZ = -0.5, drBoxCz = drBoxFrontZ - drD / 2;
   const drBottom = new THREE.Mesh(new THREE.BoxGeometry(drBoxW, 2, drD), storageInnerMat);
   drBottom.position.set(0, -drBoxH / 2 + 1, drBoxCz); drBottom.castShadow = true; storageDrawerPivot.add(drBottom);
   const drLeft = new THREE.Mesh(new THREE.BoxGeometry(2, drBoxH, drD), storageInnerMat);
@@ -6966,9 +6972,9 @@ function build() {
     G.add(rod);
   });
 
-  const wardDoorT = 2, wardDoorX = wLeft + wardDoorT / 2, wardDoorD = wardrobeD;
+  const wardDoorT = 2, wardDoorX = wLeft + wardDoorT / 2 + 0.02, wardDoorD = wardrobeD;
   wardDoorPivots = []; wardDoorStates = [false, false];
-  [{y: 112.5, h: 225}, {y: 242.5, h: 35}].forEach((d, i) => {
+  [{y: 112.25, h: 224.5}, {y: 242.5, h: 31}].forEach((d, i) => {
     const pivot = new THREE.Group();
     pivot.position.set(wardDoorX, d.y, wardrobeZ + wardDoorD / 2);
     G.add(pivot);
@@ -7043,22 +7049,22 @@ function build() {
   dskDr.position.set(0, 0, 0);
   G.add(dskDr);
   deskDrawer = dskDr;
-  const dskDrFront = makeFrontPanel(dskDrW, dskDrH, 2, 1.2, 'top', deskMat, 'deskDrawer');
+  const dskDrFront = makeFrontPanel(dskDrW, dskDrH, 2, 1.2, 'bottom', deskMat, 'deskDrawer');
   dskDrFront.rotation.y = -Math.PI / 2;
   dskDrFront.position.set((dskDrX1 + dskDrX2) / 2, dskDrYc, dskDrZc);
   dskDr.add(dskDrFront);
-  const dskDrBottom = new THREE.Mesh(new THREE.BoxGeometry(dskDrD - 2, 1.5, dskDrW - 4), deskMat);
+  const dskDrBottom = new THREE.Mesh(new THREE.BoxGeometry(dskDrD, 1.5, dskDrW - 4), deskMat);
   dskDrBottom.position.set(dskDrX2 + dskDrD / 2, dskDrBotY + 0.75, dskDrZc);
   dskDrBottom.castShadow = true; dskDrBottom.receiveShadow = true;
   dskDr.add(dskDrBottom);
   [dskDrZ1 + 2, dskDrZ2 - 2].forEach(zEdge => {
-    const side = new THREE.Mesh(new THREE.BoxGeometry(dskDrD - 2, dskDrH - 1.5, 1.5), deskMat);
+    const side = new THREE.Mesh(new THREE.BoxGeometry(dskDrD, dskDrH - 1.5, 1.5), deskMat);
     side.position.set(dskDrX2 + dskDrD / 2, dskDrBotY + 1.5 + (dskDrH - 1.5) / 2, zEdge);
     side.castShadow = true; side.receiveShadow = true;
     dskDr.add(side);
   });
   const dskDrBack = new THREE.Mesh(new THREE.BoxGeometry(1.5, dskDrH - 1.5, dskDrW - 4), deskMat);
-  dskDrBack.position.set(dskDrBackX - 0.75, dskDrBotY + 1.5 + (dskDrH - 1.5) / 2, dskDrZc);
+  dskDrBack.position.set(dskDrBackX - 0.95, dskDrBotY + 1.5 + (dskDrH - 1.5) / 2, dskDrZc);
   dskDrBack.castShadow = true; dskDrBack.receiveShadow = true;
   dskDr.add(dskDrBack);
   // 拉軌：貼在桌底（y 790–810mm），在抽屜兩側外緣，與穿線孔 z 245–295mm 無衝突
@@ -7457,7 +7463,7 @@ function build() {
   const bcAx1 = 83.5, bcAx2 = 113.5, bcAz1 = 20.5, bcAz2 = 112.5;
   const bcAcx = (bcAx1 + bcAx2) / 2, bcAcz = (bcAz1 + bcAz2) / 2;
   const bcALen = bcAz2 - bcAz1, bcAW = bcAx2 - bcAx1;
-  mbox('bcA bottom', bcAcx, bcBottom + bcT / 2, bcAcz, bcAW, bcT, bcALen, storageMat);
+  mbox('bcA bottom', bcAcx + 1, bcBottom + bcT / 2, bcAcz, bcAW - 2, bcT, bcALen, storageMat);
   mbox('bcA top', bcAcx, bcTop - bcT / 2, bcAcz, bcAW, bcT, bcALen, storageMat);
   mbox('bcA back', bcAx2 - bcT / 2, bcCy, bcAcz, bcT, bcH - 2 * bcT, bcALen, storageMat);
   mbox('bcA sideF', bcAcx, bcCy, bcAz1 + bcT / 2, bcAW, bcH - 2 * bcT, bcT, storageMat);
@@ -7476,13 +7482,13 @@ function build() {
   box('bcB shelf1', bcBcx, bcShelf1Y, bcBcz + 1, bcBLen - 2 * bcT, bcT, bcBW - bcT - 2, storageInnerMat);
   box('bcB shelf2', bcBcx, bcShelf2Y, bcBcz + 1, bcBLen - 2 * bcT, bcT, bcBW - bcT - 2, storageInnerMat);
 
-  const bcWoodDoorT = 2, bcWoodDoorW = 62, bcWoodDoorH = bcH - 4;
+  const bcWoodDoorT = 2, bcWoodDoorW = 63.5, bcWoodDoorH = bcH - 2;
   bcWoodDoorPivot = new THREE.Group();
   bcWoodDoorPivot.position.set(bcAx1, bcCy, bcAz1);
   G.add(bcWoodDoorPivot);
-  const bcWoodPanel = makeFrontPanel(bcWoodDoorW, bcWoodDoorH, bcWoodDoorT, 1.2, 'left', storageMat, 'bcWoodDoor');
+  const bcWoodPanel = makeFrontPanel(bcWoodDoorW, bcWoodDoorH, bcWoodDoorT, 1.2, 'bottom', storageMat, 'bcWoodDoor');
   bcWoodPanel.rotation.y = Math.PI / 2;
-  bcWoodPanel.position.set(bcWoodDoorT / 2, 0, bcWoodDoorW / 2);
+  bcWoodPanel.position.set(bcWoodDoorT / 2 - 0.02, -1, bcWoodDoorW / 2);
   bcWoodDoorPivot.add(bcWoodPanel);
   markMeasurable(bcWoodDoorPivot);
 
