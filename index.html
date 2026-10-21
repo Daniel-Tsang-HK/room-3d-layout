@@ -6922,7 +6922,7 @@ function build() {
   drFront.position.set(0, 0, 0.5);
   storageDrawerPivot.add(drFront);
 
-  const drBoxW = drW - 4, drBoxH = drH - 4, drBoxFrontZ = -0.5, drBoxCz = drBoxFrontZ - drD / 2;
+  const drBoxW = drW, drBoxH = drH - 4, drBoxFrontZ = -0.5, drBoxCz = drBoxFrontZ - drD / 2;
   const drBottom = new THREE.Mesh(new THREE.BoxGeometry(drBoxW, 2, drD), storageInnerMat);
   drBottom.position.set(0, -drBoxH / 2 + 1, drBoxCz); drBottom.castShadow = true; storageDrawerPivot.add(drBottom);
   const drLeft = new THREE.Mesh(new THREE.BoxGeometry(2, drBoxH, drD), storageInnerMat);
@@ -6974,7 +6974,7 @@ function build() {
 
   const wardDoorT = 2, wardDoorX = wLeft + wardDoorT / 2 + 0.02, wardDoorD = wardrobeD;
   wardDoorPivots = []; wardDoorStates = [false, false];
-  [{y: 112.25, h: 224.5}, {y: 242.5, h: 31}].forEach((d, i) => {
+  [{y: 112, h: 224}, {y: 242, h: 32}].forEach((d, i) => {
     const pivot = new THREE.Group();
     pivot.position.set(wardDoorX, d.y, wardrobeZ + wardDoorD / 2);
     G.add(pivot);
