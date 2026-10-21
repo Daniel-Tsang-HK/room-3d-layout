@@ -7076,6 +7076,55 @@ function build() {
   });
   markMeasurable(dskDr);
 
+  /* ===== 電腦椅（歸類為「其他」）===== */
+  (function buildChair() {
+    const chair = new THREE.Group();
+    chair.name = 'computer chair';
+    chair.position.set(17, 0, 58);
+    chair.rotation.y = 0;              // 正面向長書桌
+    const dark = SM(0x2b2f36, 0.75, 0.05);
+    const black = SM(0x14171b, 0.65, 0.1);
+    const metal = SM(0x7c8288, 0.35, 0.75);
+    // 五星腳 + 輪子
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 5.2), black);
+      arm.position.set(Math.cos(a) * 13, 4, Math.sin(a) * 13);
+      arm.rotation.y = -a;
+      arm.castShadow = true; chair.add(arm);
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 2.4, 12), dark);
+      wheel.position.set(Math.cos(a) * 25, 2.4, Math.sin(a) * 25);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.castShadow = true; chair.add(wheel);
+    }
+    // 氣壓柱
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 34, 16), metal);
+    post.position.set(0, 22, 0); post.castShadow = true; chair.add(post);
+    // 座墊
+    const seat = new THREE.Mesh(new RoundedBoxGeometry(46, 8, 44, 3, 2.4), dark);
+    seat.position.set(0, 41, 0); seat.castShadow = true; seat.receiveShadow = true; chair.add(seat);
+    // 椅背（微斜）
+    const back = new THREE.Mesh(new RoundedBoxGeometry(44, 52, 7, 3, 2.6), dark);
+    back.position.set(0, 76, -21);
+    back.rotation.x = -0.12;
+    back.castShadow = true; chair.add(back);
+    // 扶手
+    [-1, 1].forEach(s => {
+      const armrest = new THREE.Mesh(new RoundedBoxGeometry(5, 3, 28, 2, 1.2), black);
+      armrest.position.set(s * 24, 63, -2);
+      armrest.castShadow = true; chair.add(armrest);
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(3.4, 9, 3.4), metal);
+      stem.position.set(s * 24, 58, -2);
+      stem.castShadow = true; chair.add(stem);
+    });
+    // 椅背支架
+    const stem2 = new THREE.Mesh(new THREE.BoxGeometry(4, 14, 4), metal);
+    stem2.position.set(0, 54, -20); stem2.castShadow = true; chair.add(stem2);
+    G.add(chair);
+    otherObjects.push(chair);
+    markMeasurable(chair);
+  })();
+
   const printerW = 40.6, printerD = 36.3;
   const printerX = 92.35, printerZ = 29 + printerW / 2, printerBaseY = 86;
   const printerWhiteMat = SM(0xf2f2f2, 0.55, 0.05);
