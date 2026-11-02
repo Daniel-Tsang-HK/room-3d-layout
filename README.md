@@ -10,7 +10,7 @@
 | `room-3-static-preview.pdf` | 靜態預覽 PDF（3D 圖＋尺寸表），適合用 WhatsApp／郵件直接傳送 |
 | `publish_to_github.ps1` | 一鍵發佈到 GitHub Pages 的 PowerShell 腳本（不用手動上傳） |
 
-## 方法 A：一鍵發佈（建議，不用找 GitHub 上傳按鈕）
+## 方法 A：一鍵發佈
 
 1. 到 https://github.com/settings/tokens → **Generate new token (classic)**
    - Note 隨便填，Expiration 選 7 days
