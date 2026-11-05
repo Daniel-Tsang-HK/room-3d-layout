@@ -80,7 +80,7 @@ h2{font-size:15px;margin:18px 0 8px}
         <button id="measure">測距：關閉</button>
       </div>
 
-      <div class="muted"><b>尺寸說明：</b>以下所有尺寸均指<b>外圍尺寸</b>，單位為 <b>mm</b>。四面牆已加地腳線（高 <b>105 mm</b>、厚 <b>20 mm</b>）。所有貼牆家具底部已內縮 <b>20 mm</b> 避開地腳線，可緊貼牆身。<br><b>點擊門板／抽屜／床台面掀板可開啟</b>，看到櫃內結構與床底儲物空間。</div>
+      <div class="muted"><b>尺寸說明：</b>以下所有尺寸均指<b>外圍尺寸</b>，單位為 <b>mm</b>。四面牆已加地腳線（高 <b>105 mm</b>、厚 <b>20 mm</b>）。所有貼牆家具底部已內縮 <b>20 mm</b> 避開地腳線，可緊貼牆身。<br><b>點擊門板／抽屜／床台面掀板可開啟</b>，看到櫃內結構與床底儲物空間；<b>點擊書桌下的延伸板，可向自己拉出並升到與桌面齊平，再點一下會先降下、再推回桌下</b>。</div>
 
       <h2>房間硬體尺寸</h2>
       <div class="card">
@@ -104,12 +104,12 @@ h2{font-size:15px;margin:18px 0 8px}
         </div>
         <div class="row stack">
           <span>L型書桌</span>
-          <span class="tag">高 860 mm<br>短邊深 400 mm<br>長邊深 350 mm</span>
+          <span class="tag">高 860 mm<br>短邊深 400 mm<br>長邊深 350 mm<br>延伸板 845 × 330 mm<br>拉出 340、升高 100 mm<br>後與桌面齊平</span>
         </div>
         <div class="row"><span>衣櫃</span><span class="tag">550(深) × 500(闊) × 2600(高) mm</span></div>
       </div>
 
-<div class="help">🖱 單指旋轉 · 雙指縮放/平移 · 點按門板/抽屜開啟<br>📏 測距模式：點家具上任意處（含打開的門、抽屜、鍵盤托板、亞克力層板），<b>只吸附畫面上看得見的角點或邊中點</b>（優先取點擊面所在平面），被遮住或木板背面（內側）的點一律不吸附；<b>第一點吸附線的端點或中點</b>，第二點可吸附在任何可見表面（含地板、牆壁）並以垂直該面計算；<b>第二點若吸附到邊，只會在端點</b>，結果自動對齊 X / Y / Z 軸</div>
+<div class="help">🖱 單指旋轉 · 雙指縮放/平移 · 點按門板/抽屜開啟 · 點書桌下的延伸板拉出並升平<br>📏 測距模式：點家具上任意處（含打開的門、抽屜、拉出的延伸桌面、亞克力層板），<b>只吸附畫面上看得見的角點或邊中點</b>（優先取點擊面所在平面），被遮住或木板背面（內側）的點一律不吸附；<b>第一點吸附線的端點或中點</b>，第二點可吸附在任何可見表面（含地板、牆壁）並以垂直該面計算；<b>第二點若吸附到邊，只會在端點</b>，結果自動對齊 X / Y / Z 軸</div>
     </div>
   </aside>
 
@@ -6074,12 +6074,11 @@ let storageDrawerPivot = null, storageDrawerOpen = false, storageDrawerClosedZ =
 let wardDoorPivots = [], wardDoorStates = [];
 let bcWoodDoorPivot = null, bcWoodDoorOpen = false;
 let bcGlassLPivot = null, bcGlassRPivot = null, bcGlassLOpen = false, bcGlassROpen = false;
-let bcGlassLClosedX = 0, bcGlassLSlide = 0, bcGlassRClosedX = 0, bcGlassRSlide = 0;
 let bedDrawers = [];
 let bedTopDoorPivot = null, bedTopDoorOpen = false;
 let bedTopDoorRPivot = null, bedTopDoorROpen = false;
 let bedMattressMesh = null, bedPillowMesh = null;
-let kbTrayPivot = null, kbTrayOpen = false, kbTrayClosedZ = 0, kbTrayTravel = 25;
+let deskExtGroup = null, deskExtLeaf = null, deskExtOpen = false, deskExtT = 0, deskExtClosedZ = 0, deskExtClosedY = 0, deskExtTravel = 0, deskExtLift = 0;
 let otherObjects = [];
 
 let measureMode = false, measurePoints = [], measureMarkers = [], measureLine = null, measureLabel = null;
@@ -6682,14 +6681,12 @@ function build() {
   bcWoodDoorPivot = null; bcWoodDoorOpen = false;
   bcGlassLPivot = bcGlassRPivot = null;
   bcGlassLOpen = false; bcGlassROpen = false;
-  bcGlassLClosedX = 0; bcGlassLSlide = 0;
-  bcGlassRClosedX = 0; bcGlassRSlide = 0;
   bedDrawers = [];
   bedTopDoorPivot = null; bedTopDoorOpen = false;
   deskDrawer = null; deskDrawerOpen = false;
   bedTopDoorRPivot = null; bedTopDoorROpen = false;
   bedMattressMesh = null; bedPillowMesh = null;
-  kbTrayPivot = null; kbTrayOpen = false; kbTrayClosedZ = 0;
+  deskExtGroup = null; deskExtLeaf = null; deskExtOpen = false; deskExtT = 0; deskExtClosedZ = 0; deskExtClosedY = 0; deskExtTravel = 0; deskExtLift = 0;
 
   wallGroup = new THREE.Group();
   wallGroup.visible = wallVisible;
@@ -7411,86 +7408,102 @@ function build() {
   capMesh.receiveShadow = true;
   G.add(capMesh);
 
-  const kbTrayW = 90, kbTrayD = 28, kbTrayT = 2;
-  const kbTrayX = 22, kbTrayY = 73, kbTrayZ = 80 + kbTrayD / 2;
-  kbTrayTravel = 25;
-  kbTrayClosedZ = kbTrayZ;
-  kbTrayPivot = new THREE.Group();
-  kbTrayPivot.position.set(kbTrayX, kbTrayY, kbTrayZ);
-  G.add(kbTrayPivot);
+  /* ===== L 型書桌：鍵盤托板改為「可拉出 + 升起的延伸桌面」 =====
+     動作：先像鍵盤托板一樣往使用者方向（-z）水平拉出，
+           完全拉出後再向上升 30 mm，與桌面齊平、後緣貼住桌邊（無縫）；
+           收回時先降回桌下，再水平推回去。 */
+  const extW = 84.5, extD = 33, extT = 3;
+  const extX = -21 + extW / 2;                                // 左右各留 3 cm 給黑色導軌；左側避開支撐板（x -27～-24）
+  const extFrontZ = 77.6;                                     // 收合時前緣比桌面內縮 1 mm
+  const extClosedCz = extFrontZ + extD / 2;
+  const extOpenCz = 77.45 - extD / 2;                         // 升平後後緣貼住桌面邊緣（留 0.5 mm 防同面閃爍）
+  const extClosedYc = deskH - deskThick - 7 - extT / 2;        // 收合：像鍵盤托板吊在桌板下（板頂 760 mm）
+  const extOpenYc = deskH - extT / 2;                         // 升平：板面與桌面同一水平（86）
+  deskExtTravel = extClosedCz - extOpenCz;
+  deskExtLift = extOpenYc - extClosedYc;
+  deskExtClosedZ = extClosedCz;
+  deskExtClosedY = extClosedYc;
+  deskExtGroup = new THREE.Group();
+  deskExtGroup.position.set(extX, extClosedYc, extClosedCz);
+  G.add(deskExtGroup);
 
-  const kbTrayMesh = new THREE.Mesh(new THREE.BoxGeometry(kbTrayW, kbTrayT, kbTrayD), deskMat);
-  kbTrayMesh.castShadow = true; kbTrayMesh.receiveShadow = true;
-  kbTrayMesh.userData.clickable = 'kbTray';
-  kbTrayPivot.add(kbTrayMesh);
-  const kbLip = new THREE.Mesh(new THREE.BoxGeometry(kbTrayW, 3, 1.5), deskMat);
-  kbLip.position.set(0, kbTrayT / 2 + 1.5, kbTrayD / 2 - 0.75);
-  kbLip.castShadow = true; kbLip.userData.clickable = 'kbTray';
-  kbTrayPivot.add(kbLip);
+  const extLeaf = new THREE.Mesh(new THREE.BoxGeometry(extW, extT, extD), deskTopMat);
+  deskExtLeaf = extLeaf;
+  extLeaf.castShadow = true; extLeaf.receiveShadow = true;
+  extLeaf.userData.clickable = 'deskExt';
+  deskExtGroup.add(extLeaf);
 
+  // 前緣金屬拉手（收合時就在桌面下緣，是主要的點擊位置）
+  const extPullMat = SM(0xb9c0c8, 0.32, 0.55);
+  const extPull = new THREE.Mesh(new THREE.BoxGeometry(extW - 18, 1.3, 0.7), extPullMat);
+  extPull.position.set(0, -0.35, -extD / 2);
+  extPull.castShadow = true;
+  extPull.userData.clickable = 'deskExt';
+  deskExtGroup.add(extPull);
+  markMeasurable(deskExtGroup);
+
+  /* 兩側黑色導軌（原本鍵盤托板的吊掛軌道做法）：
+     長導軌貼在托板左右兩側、下方，並用吊掛板固定在桌板底面；托板沿軌道拉出／推回 */
+  const extRailMat = SM(0x141414, 0.45, 0.3);
+  const extRailW = 2.5;
+  const extRailXs = [extX - extW / 2 - 1.55, extX + extW / 2 + 1.55];
+  extRailXs.forEach(rx => {
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(extRailW, 2, 32), extRailMat);
+    runner.position.set(rx, deskH - deskThick - 6, 95);            // y 76～78：貼在托板頂面兩側的滑軌
+    runner.castShadow = true; runner.receiveShadow = true;
+    G.add(runner);
+    const hanger = new THREE.Mesh(new THREE.BoxGeometry(extRailW, 8, 10), extRailMat);
+    hanger.position.set(rx, deskH - deskThick - 4, 96);            // y 75～83：把導軌吊在桌板下
+    hanger.castShadow = true; hanger.receiveShadow = true;
+    G.add(hanger);
+  });
+
+  // 鍵盤／滑鼠改放在桌面上（原本的托板已改成延伸桌面）
   const kbTexture = makeKeyboardTexture();
   const kbTopMat = new THREE.MeshStandardMaterial({map: kbTexture, roughness: 0.9});
   const kbBodyMat = SM(0x151515, 0.85);
   const kbW = 45, kbH = 2, kbD = 15;
-  const kbLocalX = 17, kbLocalZ = 0;
+  const kbX = 10, kbZ = 94;
   const keyboardMats = [kbBodyMat, kbBodyMat, kbTopMat, kbBodyMat, kbBodyMat, kbBodyMat];
   const keyboard = new THREE.Mesh(new THREE.BoxGeometry(kbW, kbH, kbD), keyboardMats);
-  keyboard.position.set(kbLocalX, kbTrayT / 2 + kbH / 2, kbLocalZ);
+  keyboard.position.set(kbX, deskH + kbH / 2, kbZ);
   keyboard.castShadow = true; keyboard.receiveShadow = true;
-  keyboard.userData.clickable = 'kbTray';
-  kbTrayPivot.add(keyboard);
+  G.add(keyboard);
   otherObjects.push(keyboard);
 
   const padMat = SM(0x2f6fd0, 0.95);
   const padEdgeMat = SM(0x1c4a94, 0.95);
-  const padW = 20, padD = 20, padLocalX = -25, padLocalZ = 0;
+  const padW = 20, padD = 20, padX = -14, padZ = 94;
   const padEdge = new THREE.Mesh(new THREE.BoxGeometry(padW, 0.2, padD), padEdgeMat);
-  padEdge.position.set(padLocalX, kbTrayT / 2 + 0.1, padLocalZ);
-  padEdge.receiveShadow = true; padEdge.userData.clickable = 'kbTray';
-  kbTrayPivot.add(padEdge);
+  padEdge.position.set(padX, deskH + 0.1, padZ);
+  padEdge.receiveShadow = true;
+  G.add(padEdge);
   otherObjects.push(padEdge);
   const mousePad = new THREE.Mesh(new THREE.BoxGeometry(padW - 1.2, 0.2, padD - 1.2), padMat);
-  mousePad.position.set(padLocalX, kbTrayT / 2 + 0.25, padLocalZ);
-  mousePad.receiveShadow = true; mousePad.userData.clickable = 'kbTray';
-  kbTrayPivot.add(mousePad);
+  mousePad.position.set(padX, deskH + 0.25, padZ);
+  mousePad.receiveShadow = true;
+  G.add(mousePad);
   otherObjects.push(mousePad);
 
   const mouseBodyMat = SM(0x1e1e1e, 0.35, 0.15);
   const mouseMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), mouseBodyMat);
   mouseMesh.scale.set(2.6, 1.6, 4.4);
-  mouseMesh.position.set(padLocalX, kbTrayT / 2 + 0.35 + 1.6, padLocalZ);
+  mouseMesh.position.set(padX, deskH + 0.35 + 1.6, padZ);
   mouseMesh.castShadow = true; mouseMesh.receiveShadow = true;
-  mouseMesh.userData.clickable = 'kbTray';
-  kbTrayPivot.add(mouseMesh);
+  G.add(mouseMesh);
   otherObjects.push(mouseMesh);
   const seamMat = SM(0x0a0a0a, 0.9);
   const seam = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 2.8), seamMat);
-  seam.position.set(padLocalX, kbTrayT / 2 + 0.35 + 3.2, padLocalZ - 0.6);
-  kbTrayPivot.add(seam);
+  seam.position.set(padX, deskH + 0.35 + 3.2, padZ - 0.6);
+  G.add(seam);
   otherObjects.push(seam);
   const wheelMat = SM(0x3a3a3a, 0.6, 0.3);
   const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.9, 14), wheelMat);
   wheel.rotation.z = Math.PI / 2;
-  wheel.position.set(padLocalX, kbTrayT / 2 + 0.35 + 2.3, padLocalZ + 1.4);
+  wheel.position.set(padX, deskH + 0.35 + 2.3, padZ + 1.4);
   wheel.castShadow = true;
-  kbTrayPivot.add(wheel);
+  G.add(wheel);
   otherObjects.push(wheel);
-
-  // 兩條吊掛：把托板吊在桌面下方（黑色）
-  const hangMat = SM(0x141414, 0.45, 0.3);
-  const hangX = kbTrayW / 2 + 1.5;
-  [-1, 1].forEach(side => {
-    const x = kbTrayX + side * hangX;
-    const runner = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 34), hangMat);
-    runner.position.set(x, 75, 95);
-    runner.castShadow = true; runner.receiveShadow = true;
-    G.add(runner);
-    const hanger = new THREE.Mesh(new THREE.BoxGeometry(2.5, 8, 10), hangMat);
-    hanger.position.set(x, 79, 96);
-    hanger.castShadow = true; hanger.receiveShadow = true;
-    G.add(hanger);
-  });
-  markMeasurable(kbTrayPivot);
 
   const monitorX = 17, monitorY = 110, monitorW = 52, monitorH = 30, monitorT = 2.5;
   const monitorBackZ = 110.5, monitorCz = monitorBackZ - monitorT / 2;
@@ -7535,55 +7548,60 @@ function build() {
   box('bcB shelf1', bcBcx, bcShelf1Y, bcBcz + 1, bcBLen - 2 * bcT, bcT, bcBW - bcT - 2, storageInnerMat);
   box('bcB shelf2', bcBcx, bcShelf2Y, bcBcz + 1, bcBLen - 2 * bcT, bcT, bcBW - bcT - 2, storageInnerMat);
 
-  const bcWoodDoorT = 2, bcWoodDoorW = 63.5, bcWoodDoorH = bcH - 2;
+  /* 木門書櫃：木門改為在另一邊鉸鏈開啟（鉸鏈移到貼近玻璃門書櫃的一側） */
+  const bcWoodDoorT = 2, bcWoodDoorW = bcBz1 - bcAz1, bcWoodDoorH = bcH - 2;
   bcWoodDoorPivot = new THREE.Group();
-  bcWoodDoorPivot.position.set(bcAx1, bcCy, bcAz1);
+  bcWoodDoorPivot.position.set(bcAx1, bcCy, bcBz1);
   G.add(bcWoodDoorPivot);
   const bcWoodPanel = makeFrontPanel(bcWoodDoorW, bcWoodDoorH, bcWoodDoorT, 1.2, 'bottom', storageMat, 'bcWoodDoor');
   bcWoodPanel.rotation.y = Math.PI / 2;
-  bcWoodPanel.position.set(bcWoodDoorT / 2 - 0.02, -1, bcWoodDoorW / 2);
+  bcWoodPanel.position.set(bcWoodDoorT / 2 - 0.02, -1, -bcWoodDoorW / 2);
   bcWoodDoorPivot.add(bcWoodPanel);
   markMeasurable(bcWoodDoorPivot);
 
+  /* 玻璃門書櫃：由趟門改為平開門（兩扇同一平面、左右外側鉸鏈、中間對開） */
   const bcGlassDoorT = 1.5, bcGlassDoorH = bcH - 4, bcGlassHalfW = bcBLen / 2 - bcT, bcgT = 1.5;
-  const bcRailInnerZ = bcBz1 + 0.5, bcRailOuterZ = bcBz1 + 2.0;
+  const bcGlassDoorZ = bcBz1 + bcGlassDoorT / 2;      // 門板嵌在櫃身內，與櫃口齊平
+  const bcGlassFrameD = bcGlassDoorT + 0.6;
 
-  bcGlassLClosedX = bcBx1 + bcT + bcGlassHalfW / 2;
-  bcGlassLSlide = bcGlassHalfW;
+  function makeBcGlassDoor(panelW, tag, handleSide) {
+    const g = new THREE.Group();
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(panelW, bcGlassDoorH, bcGlassDoorT), glassMat);
+    pane.castShadow = true; pane.receiveShadow = true;
+    pane.userData.clickable = tag;
+    g.add(pane);
+    [[0, bcGlassDoorH / 2 - bcgT / 2, panelW, bcgT],
+     [0, -bcGlassDoorH / 2 + bcgT / 2, panelW, bcgT],
+     [-panelW / 2 + bcgT / 2, 0, bcgT, bcGlassDoorH],
+     [panelW / 2 - bcgT / 2, 0, bcgT, bcGlassDoorH]].forEach(([fx, fy, fw, fh]) => {
+      const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, bcGlassFrameD), handleMat);
+      fm.position.set(fx, fy, 0);
+      fm.castShadow = true;
+      fm.userData.clickable = tag;
+      g.add(fm);
+    });
+    const hd = new THREE.Mesh(new THREE.BoxGeometry(1.4, 18, 1.4), handleMat);
+    hd.position.set(handleSide * (panelW / 2 - bcgT - 2.2), 0, -(bcGlassFrameD / 2 + 0.7));
+    hd.castShadow = true;
+    hd.userData.clickable = tag;
+    g.add(hd);
+    return g;
+  }
+
   bcGlassLPivot = new THREE.Group();
-  bcGlassLPivot.position.set(bcGlassLClosedX, bcCy, bcRailInnerZ);
+  bcGlassLPivot.position.set(bcBx1 + bcT, bcCy, bcGlassDoorZ);
   G.add(bcGlassLPivot);
-  const bcGlassLPanel = new THREE.Mesh(new THREE.BoxGeometry(bcGlassHalfW, bcGlassDoorH, bcGlassDoorT), glassMat);
-  bcGlassLPanel.userData.clickable = 'bcGlassL';
-  bcGlassLPivot.add(bcGlassLPanel);
-  [[0, bcGlassDoorH/2 - bcgT/2, 0, bcGlassHalfW, bcgT, bcGlassDoorT + 0.6],
-   [0, -bcGlassDoorH/2 + bcgT/2, 0, bcGlassHalfW, bcgT, bcGlassDoorT + 0.6],
-   [-bcGlassHalfW/2 + bcgT/2, 0, 0, bcgT, bcGlassDoorH, bcGlassDoorT + 0.6],
-   [bcGlassHalfW/2 - bcgT/2, 0, 0, bcgT, bcGlassDoorH, bcGlassDoorT + 0.6]].forEach(([fx, fy, fz, fw, fh, fd]) => {
-    const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fd), handleMat);
-    fm.position.set(fx, fy, fz); fm.castShadow = true;
-    fm.userData.clickable = 'bcGlassL';
-    bcGlassLPivot.add(fm);
-  });
+  const bcGlassLGroup = makeBcGlassDoor(bcGlassHalfW, 'bcGlassL', 1);
+  bcGlassLGroup.position.set(bcGlassHalfW / 2, 0, 0);
+  bcGlassLPivot.add(bcGlassLGroup);
   markMeasurable(bcGlassLPivot);
 
-  bcGlassRClosedX = bcBx2 - bcT - bcGlassHalfW / 2;
-  bcGlassRSlide = bcGlassHalfW;
   bcGlassRPivot = new THREE.Group();
-  bcGlassRPivot.position.set(bcGlassRClosedX, bcCy, bcRailOuterZ);
+  bcGlassRPivot.position.set(bcBx2 - bcT, bcCy, bcGlassDoorZ);
   G.add(bcGlassRPivot);
-  const bcGlassRPanel = new THREE.Mesh(new THREE.BoxGeometry(bcGlassHalfW, bcGlassDoorH, bcGlassDoorT), glassMat);
-  bcGlassRPanel.userData.clickable = 'bcGlassR';
-  bcGlassRPivot.add(bcGlassRPanel);
-  [[0, bcGlassDoorH/2 - bcgT/2, 0, bcGlassHalfW, bcgT, bcGlassDoorT + 0.6],
-   [0, -bcGlassDoorH/2 + bcgT/2, 0, bcGlassHalfW, bcgT, bcGlassDoorT + 0.6],
-   [-bcGlassHalfW/2 + bcgT/2, 0, 0, bcgT, bcGlassDoorH, bcGlassDoorT + 0.6],
-   [bcGlassHalfW/2 - bcgT/2, 0, 0, bcgT, bcGlassDoorH, bcGlassDoorT + 0.6]].forEach(([fx, fy, fz, fw, fh, fd]) => {
-    const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fd), handleMat);
-    fm.position.set(fx, fy, fz); fm.castShadow = true;
-    fm.userData.clickable = 'bcGlassR';
-    bcGlassRPivot.add(fm);
-  });
+  const bcGlassRGroup = makeBcGlassDoor(bcGlassHalfW, 'bcGlassR', -1);
+  bcGlassRGroup.position.set(-bcGlassHalfW / 2, 0, 0);
+  bcGlassRPivot.add(bcGlassRGroup);
   markMeasurable(bcGlassRPivot);
 
   /* ===== 亞克力書立架（透明藍，放於打印機與衣櫃之間） ===== */
@@ -7704,7 +7722,7 @@ function tryToggleDoors(clientX, clientY) {
   else if (tag === 'bcWoodDoor') bcWoodDoorOpen = !bcWoodDoorOpen;
   else if (tag === 'bcGlassL') bcGlassLOpen = !bcGlassLOpen;
   else if (tag === 'bcGlassR') bcGlassROpen = !bcGlassROpen;
-  else if (tag === 'kbTray') kbTrayOpen = !kbTrayOpen;
+  else if (tag === 'deskExt') deskExtOpen = !deskExtOpen;
   else if (tag === 'deskDrawer') deskDrawerOpen = !deskDrawerOpen;
 }
 
@@ -7756,20 +7774,26 @@ function animate() {
   if (bedMattressMesh) bedMattressMesh.visible = otherVisible && !bedOpen;
   if (bedPillowMesh) bedPillowMesh.visible = otherVisible && !bedOpen;
   if (bcWoodDoorPivot) {
-    const target = bcWoodDoorOpen ? -Math.PI / 2 : 0;
+    const target = bcWoodDoorOpen ? Math.PI / 2 : 0;
     bcWoodDoorPivot.rotation.y += (target - bcWoodDoorPivot.rotation.y) * 0.14;
   }
   if (bcGlassLPivot) {
-    const targetX = bcGlassLOpen ? bcGlassLClosedX + bcGlassLSlide : bcGlassLClosedX;
-    bcGlassLPivot.position.x += (targetX - bcGlassLPivot.position.x) * 0.14;
+    const target = bcGlassLOpen ? Math.PI / 2 : 0;
+    bcGlassLPivot.rotation.y += (target - bcGlassLPivot.rotation.y) * 0.14;
   }
   if (bcGlassRPivot) {
-    const targetX = bcGlassROpen ? bcGlassRClosedX - bcGlassRSlide : bcGlassRClosedX;
-    bcGlassRPivot.position.x += (targetX - bcGlassRPivot.position.x) * 0.14;
+    const target = bcGlassROpen ? -Math.PI / 2 : 0;
+    bcGlassRPivot.rotation.y += (target - bcGlassRPivot.rotation.y) * 0.14;
   }
-  if (kbTrayPivot) {
-    const targetZ = kbTrayOpen ? kbTrayClosedZ - kbTrayTravel : kbTrayClosedZ;
-    kbTrayPivot.position.z += (targetZ - kbTrayPivot.position.z) * 0.14;
+  if (deskExtGroup) {
+    // t：0 = 完全收入，1 = 拉出並升平；先滑出（0→0.6）、再上升（0.6→1），收回時反序
+    const target = deskExtOpen ? 1 : 0;
+    deskExtT += (target - deskExtT) * 0.12;
+    if (Math.abs(target - deskExtT) < 0.001) deskExtT = target;
+    const slide = Math.min(1, deskExtT / 0.6);
+    const lift = Math.max(0, Math.min(1, (deskExtT - 0.6) / 0.4));
+    deskExtGroup.position.z = deskExtClosedZ - deskExtTravel * slide;
+    deskExtGroup.position.y = deskExtClosedY + deskExtLift * lift;
   }
   if (deskDrawer) {
     const targetX = deskDrawerOpen ? -25 : 0;
