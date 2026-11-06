@@ -6072,10 +6072,11 @@ let deskDrawer = null, deskDrawerOpen = false;
 let storageGlassLPivot = null, storageGlassRPivot = null, storageGlassLOpen = false, storageGlassROpen = false;
 let storageDrawerPivot = null, storageDrawerOpen = false, storageDrawerClosedZ = 0;
 let wardDoorPivots = [], wardDoorStates = [];
+let wardDrawerPivot = null, wardDrawerOpen = false, wardDrawerClosedX = 0;
 let bcWoodDoorPivot = null, bcWoodDoorOpen = false;
 let bcGlassLPivot = null, bcGlassRPivot = null, bcGlassLOpen = false, bcGlassROpen = false;
 let bedDrawers = [];
-let bedTopDoorPivot = null, bedTopDoorOpen = false;
+let bedLidAPivot = null, bedLidAOpen = false, bedLidBPivot = null, bedLidBOpen = false;
 let bedTopDoorRPivot = null, bedTopDoorROpen = false;
 let bedMattressMesh = null, bedPillowMesh = null;
 let deskExtGroup = null, deskExtLeaf = null, deskExtOpen = false, deskExtT = 0, deskExtClosedZ = 0, deskExtClosedY = 0, deskExtTravel = 0, deskExtLift = 0;
@@ -6136,6 +6137,29 @@ function makeInsetBoxMesh(w, h, d, mat, notches, name) {
     g.add(top);
   }
   return g;
+}
+
+function makeChairMeshTexture() {
+  const S = 64, N = 5, cell = S / N;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#2a2f36';
+  ctx.fillRect(0, 0, S, S);
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      ctx.beginPath();
+      ctx.arc((i + 0.5) * cell, (j + 0.5) * cell, cell * 0.33, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(12, 14);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 }
 
 function makeKeyboardTexture() {
@@ -6678,11 +6702,12 @@ function build() {
   storageGlassLOpen = storageGlassROpen = false;
   storageDrawerPivot = null; storageDrawerOpen = false; storageDrawerClosedZ = 0;
   wardDoorPivots = []; wardDoorStates = [];
+  wardDrawerPivot = null; wardDrawerOpen = false; wardDrawerClosedX = 0;
   bcWoodDoorPivot = null; bcWoodDoorOpen = false;
   bcGlassLPivot = bcGlassRPivot = null;
   bcGlassLOpen = false; bcGlassROpen = false;
   bedDrawers = [];
-  bedTopDoorPivot = null; bedTopDoorOpen = false;
+  bedLidAPivot = null; bedLidAOpen = false; bedLidBPivot = null; bedLidBOpen = false;
   deskDrawer = null; deskDrawerOpen = false;
   bedTopDoorRPivot = null; bedTopDoorROpen = false;
   bedMattressMesh = null; bedPillowMesh = null;
@@ -6781,6 +6806,10 @@ function build() {
   const bedCabRz1 = bedCz + 1, bedCabRz2 = bedCz + bedD / 2 - bedWallT;
   mbox('bed cabinet divider right', 56.5, bedWallY, (bedCabRz1 + bedCabRz2) / 2, 2, bedWallH, bedCabRz2 - bedCabRz1, bedMat);
 
+  /* 長格（前側一整條）再平分為兩格 */
+  const bedCabFz1 = bedCz - (bedD / 2 - bedWallT), bedCabFz2 = bedCz - 1;
+  mbox('bed cabinet divider front', bedCx, bedWallY, (bedCabFz1 + bedCabFz2) / 2, 2, bedWallH, bedCabFz2 - bedCabFz1, bedMat);
+
   const bedPullMat = SM(0x16294d, 0.85);
   const bedHingeY = bedH - bedBoardT / 2;
   function makeBedStrap(clickTag) {
@@ -6791,18 +6820,29 @@ function build() {
     return strap;
   }
 
-  bedTopDoorPivot = new THREE.Group();
-  bedTopDoorPivot.position.set(bedCx, bedHingeY, bedCz - bedHalfD);
-  G.add(bedTopDoorPivot);
-  const bedTopDoor = new THREE.Mesh(new THREE.BoxGeometry(bedW, bedBoardT, bedHalfD), bedMat);
-  bedTopDoor.position.set(0, 0, bedHalfD / 2);
-  bedTopDoor.castShadow = true; bedTopDoor.receiveShadow = true;
-  bedTopDoor.userData.clickable = 'bedTopDoor';
-  bedTopDoorPivot.add(bedTopDoor);
-  const bedPullL = makeBedStrap('bedTopDoor');
-  bedPullL.position.set(0, bedBoardT / 2, bedHalfD - 10);
-  bedTopDoorPivot.add(bedPullL);
-  markMeasurable(bedTopDoorPivot);
+  /* 床底掀板分成兩塊（與下方兩格對齊），各有一個拉手帶 */
+  const bedLidGap = 0.4;
+  const bedLidHalfW = (bedW - bedLidGap) / 2;
+  const bedLidXs = [
+    (bedCx - bedW / 2) + bedLidHalfW / 2,
+    (bedCx + bedW / 2) - bedLidHalfW / 2
+  ];
+  [['bedLidA', bedLidXs[0]], ['bedLidB', bedLidXs[1]]].forEach(function (cfg) {
+    const tag = cfg[0], cx = cfg[1];
+    const pivot = new THREE.Group();
+    pivot.position.set(cx, bedHingeY, bedCz - bedHalfD);
+    G.add(pivot);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(bedLidHalfW, bedBoardT, bedHalfD), bedMat);
+    lid.position.set(0, 0, bedHalfD / 2);
+    lid.castShadow = true; lid.receiveShadow = true;
+    lid.userData.clickable = tag;
+    pivot.add(lid);
+    const pull = makeBedStrap(tag);
+    pull.position.set(0, bedBoardT / 2, bedHalfD - 10);
+    pivot.add(pull);
+    markMeasurable(pivot);
+    if (tag === 'bedLidA') bedLidAPivot = pivot; else bedLidBPivot = pivot;
+  });
 
   const bedLidRFrom = 56.5;                                   // 與衣櫃側床底櫃的分界
   const bedFixedW = bedLidRFrom - (bedCx - bedW / 2);
@@ -6956,12 +6996,16 @@ function build() {
   mbox('ward back', wardrobeX, wardrobeH / 2, wBack - wT / 2, wardrobeW - 2 * wT, wardrobeH - 2 * wT, wT, storageMat);
   mbox('ward right', wRight - wT / 2, (10.5 + wardrobeH - wT) / 2, wardrobeZ, wT, wardrobeH - wT - 10.5, wardrobeD - 2 * wT, storageMat);
   mbox('ward front', wardrobeX, wardrobeH / 2, wFront + wT / 2, wardrobeW - 2 * wT, wardrobeH - 2 * wT, wT, storageMat);
-  [116, 225].forEach(y => {
+  /* 衣櫃：下格為抽屜（面板高 340 mm，與床底抽屜同高）；
+     上格為長門，鉸鏈在靠床的一側；長門內分三格：
+     最上為 500 mm 儲物格，其下兩格為掛衣格且高度平分（各 840 mm），
+     每格各有一支掛衣橫樑 */
+  [121, 35, 207].forEach(y => {
     box('ward shelf ' + y, wardrobeX, y, wardrobeZ, wardrobeW - 2 * wT, wT, wardrobeD - 2 * wT, storageInnerMat);
   });
   const rodR = 1.2, rodLen = wardrobeD - 8;
   const rodGeo = new THREE.CylinderGeometry(rodR, rodR, rodLen, 14);
-  [104, 213].forEach(y => {
+  [111, 197].forEach(y => {
     const rod = new THREE.Mesh(rodGeo, handleMat);
     rod.rotation.x = Math.PI / 2;
     rod.position.set(wardrobeX, y, wardrobeZ);
@@ -6969,19 +7013,103 @@ function build() {
     G.add(rod);
   });
 
+  /* 長門：鉸鏈在靠床一側；開啟側（自由邊）挖一個「垂直」指扣缺口
+     闊 20 mm × 高 290 mm、深 13 mm，缺口中心離地 870 mm，方便開門 */
   const wardDoorT = 2, wardDoorX = wLeft + wardDoorT / 2 + 0.02, wardDoorD = wardrobeD;
-  wardDoorPivots = []; wardDoorStates = [false, false];
-  [{y: 112, h: 224}, {y: 242, h: 32}].forEach((d, i) => {
+  const notchW = 2, notchLen = 29, notchD = 1.3, notchYc = 87;   // 20 mm 闊、290 mm 高、13 mm 深
+  const notchMat = new THREE.MeshStandardMaterial({color: 0x0f1012, roughness: 0.92, metalness: 0.02, side: THREE.BackSide});
+  wardDoorPivots = []; wardDoorStates = [false];
+  [{y: 146, h: 224}].forEach((d, i) => {
     const pivot = new THREE.Group();
-    pivot.position.set(wardDoorX, d.y, wardrobeZ + wardDoorD / 2);
+    pivot.position.set(wardDoorX, d.y, wardrobeZ - wardDoorD / 2);
     G.add(pivot);
     wardDoorPivots.push(pivot);
-    const panel = makeFrontPanel(wardDoorD, d.h, wardDoorT, 1.2, 'left', storageMat, 'wardDoor', {wardDoorIdx: i});
-    panel.rotation.y = -Math.PI / 2;
-    panel.position.set(0, 0, -wardDoorD / 2);
-    pivot.add(panel);
+
+    const door = new THREE.Group();
+    door.rotation.y = -Math.PI / 2;
+    door.position.set(0, 0, wardDoorD / 2);
+    pivot.add(door);
+
+    const W = wardDoorD, H = d.h, T = wardDoorT, backT = T - notchD;
+    // 背板 7 mm
+    const wdBackPlate = new THREE.Mesh(new THREE.BoxGeometry(W, H, backT), storageMat);
+    wdBackPlate.position.set(0, 0, -T / 2 + backT / 2);
+    wdBackPlate.castShadow = true; wdBackPlate.receiveShadow = true;
+    door.add(wdBackPlate);
+
+    // 前層 13 mm，於自由邊切出垂直缺口（內側上下角做 R10 圓角）
+    const nx1 = W / 2 - notchW, nx2 = W / 2;
+    const nyc = notchYc - d.y, ny1 = nyc - notchLen / 2, ny2 = nyc + notchLen / 2;
+    const fr = notchW / 2;                                  // 圓角半徑 = 10 mm
+    const faceShape = new THREE.Shape();
+    faceShape.moveTo(-W / 2, -H / 2);
+    faceShape.lineTo(W / 2, -H / 2);
+    faceShape.lineTo(W / 2, ny1);
+    faceShape.lineTo(nx1 + fr, ny1);
+    faceShape.quadraticCurveTo(nx1, ny1, nx1, ny1 + fr);
+    faceShape.lineTo(nx1, ny2 - fr);
+    faceShape.quadraticCurveTo(nx1, ny2, nx1 + fr, ny2);
+    faceShape.lineTo(W / 2, ny2);
+    faceShape.lineTo(W / 2, H / 2);
+    faceShape.lineTo(-W / 2, H / 2);
+    faceShape.closePath();
+    const faceGeo = new THREE.ExtrudeGeometry(faceShape, {depth: notchD, bevelEnabled: false});
+    faceGeo.translate(0, 0, T / 2 - notchD);
+    const wdFacePlate = new THREE.Mesh(faceGeo, storageMat);
+    wdFacePlate.castShadow = true; wdFacePlate.receiveShadow = true;
+    door.add(wdFacePlate);
+
+    // 缺口的黑色內壁（BackSide，同樣做圓角，看進去是黑色的圓角凹槽）
+    const ix = 0.03;
+    const pxs = nx1 + ix, pxe = W / 2, pys = ny1 + ix, pye = ny2 - ix;
+    const pocketShape = new THREE.Shape();
+    pocketShape.moveTo(pxs + fr, pys);
+    pocketShape.lineTo(pxe, pys);
+    pocketShape.lineTo(pxe, pye);
+    pocketShape.lineTo(pxs + fr, pye);
+    pocketShape.quadraticCurveTo(pxs, pye, pxs, pye - fr);
+    pocketShape.lineTo(pxs, pys + fr);
+    pocketShape.quadraticCurveTo(pxs, pys, pxs + fr, pys);
+    pocketShape.closePath();
+    const pocketGeo = new THREE.ExtrudeGeometry(pocketShape, {depth: notchD - 0.02, bevelEnabled: false});
+    pocketGeo.translate(0, 0, T / 2 - notchD + 0.01);
+    const notchPocket = new THREE.Mesh(pocketGeo, notchMat);
+    door.add(notchPocket);
+
+    [wdBackPlate, wdFacePlate, notchPocket].forEach(m => {
+      m.userData.clickable = 'wardDoor';
+      m.userData.wardDoorIdx = i;
+    });
     markMeasurable(pivot);
   });
+
+  /* 下格抽屜：面板 500 × 340 mm（與床底抽屜同高），可拉出 400 mm；
+     面板與長門之間留 8 mm 黑縫，看得出是抽屜 */
+  const wdH = 33.2, wdT = 2, wdD = 45;
+  const wdInnerW = wardrobeD - 4, wdInnerH = wdH - 4;
+  wardDrawerClosedX = wardDoorX;
+  wardDrawerPivot = new THREE.Group();
+  wardDrawerPivot.position.set(wardDrawerClosedX, wdH / 2, wardrobeZ);
+  G.add(wardDrawerPivot);
+  const wdFront = makeFrontPanel(wardrobeD, wdH, wdT, 1.2, 'top', storageMat, 'wardDrawer');
+  wdFront.rotation.y = -Math.PI / 2;
+  wardDrawerPivot.add(wdFront);
+  mbox('ward drawer gap', wardDoorX + 0.4, 33.6, wardrobeZ, 0.8, 0.8, wardrobeD, frontTrimMat);
+  const wdBottom = new THREE.Mesh(new THREE.BoxGeometry(wdD, 2, wdInnerW), storageInnerMat);
+  wdBottom.position.set(wdT + wdD / 2, -wdInnerH / 2 + 1, 0);
+  wdBottom.castShadow = true; wdBottom.receiveShadow = true;
+  wardDrawerPivot.add(wdBottom);
+  [-1, 1].forEach(s => {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(wdD, wdInnerH, 2), storageInnerMat);
+    side.position.set(wdT + wdD / 2, 0, s * (wdInnerW / 2 - 1));
+    side.castShadow = true; side.receiveShadow = true;
+    wardDrawerPivot.add(side);
+  });
+  const wdBack = new THREE.Mesh(new THREE.BoxGeometry(2, wdInnerH, wdInnerW), storageInnerMat);
+  wdBack.position.set(wdT + wdD - 1, 0, 0);
+  wdBack.castShadow = true; wdBack.receiveShadow = true;
+  wardDrawerPivot.add(wdBack);
+  markMeasurable(wardDrawerPivot);
 
   const deskH = 86, deskThick = 3;
   const deskDepthB = 35;
@@ -7080,12 +7208,12 @@ function build() {
     chair.position.set(17, 0, 58);
     chair.rotation.y = 0;              // 正面向長書桌
     const dark = SM(0x2b2f36, 0.75, 0.05);
-    const black = SM(0x14171b, 0.65, 0.1);
     const metal = SM(0x7c8288, 0.35, 0.75);
+    const blackBase = SM(0x14171b, 0.65, 0.1);   // 椅腳（黑色）
     // 五星腳 + 輪子
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 5.2), black);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 5.2), blackBase);
       arm.position.set(Math.cos(a) * 13, 4, Math.sin(a) * 13);
       arm.rotation.y = -a;
       arm.castShadow = true; chair.add(arm);
@@ -7095,29 +7223,91 @@ function build() {
       wheel.castShadow = true; chair.add(wheel);
     }
     // 中央底座（連接五爪，避免看起來懸空）
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.8, 5, 16), black);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.8, 5, 16), blackBase);
     hub.position.set(0, 3.4, 0);
     hub.castShadow = true; chair.add(hub);
     // 氣壓柱
     const post = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 34, 16), metal);
     post.position.set(0, 22, 0); post.castShadow = true; chair.add(post);
-    // 座墊
-    const seat = new THREE.Mesh(new RoundedBoxGeometry(46, 8, 44, 3, 2.4), dark);
-    seat.position.set(0, 41, 0); seat.castShadow = true; seat.receiveShadow = true; chair.add(seat);
-    // 椅背（微斜）
-    const back = new THREE.Mesh(new RoundedBoxGeometry(44, 52, 7, 3, 2.6), dark);
-    back.position.set(0, 76, -21);
-    back.rotation.x = -0.12;
-    back.castShadow = true; chair.add(back);
-    // 扶手
-    [-1, 1].forEach(s => {
-      const armrest = new THREE.Mesh(new RoundedBoxGeometry(5, 3, 28, 2, 1.2), black);
-      armrest.position.set(s * 24, 63, -2);
-      armrest.castShadow = true; chair.add(armrest);
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(3.4, 17, 3.4), metal);
-      stem.position.set(s * 24, 53.5, -2);
-      stem.castShadow = true; chair.add(stem);
+    // 座墊：前兩角 R100 圓角，其他角小圓角
+    function seatShape(w, d, rf, rb) {
+      const s = new THREE.Shape();
+      const x0 = -w / 2, x1 = w / 2, y0 = -d / 2, y1 = d / 2;
+      s.moveTo(x0 + rb, y0);
+      s.lineTo(x1 - rb, y0);
+      s.absarc(x1 - rb, y0 + rb, rb, -Math.PI / 2, 0, false);
+      s.lineTo(x1, y1 - rf);
+      s.absarc(x1 - rf, y1 - rf, rf, 0, Math.PI / 2, false);
+      s.lineTo(x0 + rf, y1);
+      s.absarc(x0 + rf, y1 - rf, rf, Math.PI / 2, Math.PI, false);
+      s.lineTo(x0, y0 + rb);
+      s.absarc(x0 + rb, y0 + rb, rb, Math.PI, Math.PI * 1.5, false);
+      return s;
+    }
+    const seatBs = 1.2, seatBt = 1.2;
+    const seatGeo = new THREE.ExtrudeGeometry(
+      seatShape(46 - 2 * seatBs, 44 - 2 * seatBs, 10 - seatBs, 3 - seatBs),
+      {depth: 8 - 2 * seatBt, bevelEnabled: true, bevelSize: seatBs, bevelThickness: seatBt, bevelSegments: 2, curveSegments: 24}
+    );
+    seatGeo.rotateX(Math.PI / 2);
+    seatGeo.translate(0, 37 + 8 - seatBt, 0);
+    const seat = new THREE.Mesh(seatGeo, dark);
+    seat.castShadow = true; seat.receiveShadow = true;
+    chair.add(seat);
+    // 椅背：高度 670 mm、下緣平齊椅墊（y = 450），上角 R70、下角 R180，網狀
+    const backW = 44, backH = 67, rTop = 7, rBot = 18, frameW = 2.8, frameD = 3.4;
+    function backShape(w, h, rt, rb) {
+      const s = new THREE.Shape();
+      const x0 = -w / 2, x1 = w / 2, y0 = -h / 2, y1 = h / 2;
+      s.moveTo(x0 + rb, y0);
+      s.lineTo(x1 - rb, y0);
+      s.absarc(x1 - rb, y0 + rb, rb, -Math.PI / 2, 0, false);
+      s.lineTo(x1, y1 - rt);
+      s.absarc(x1 - rt, y1 - rt, rt, 0, Math.PI / 2, false);
+      s.lineTo(x0 + rt, y1);
+      s.absarc(x0 + rt, y1 - rt, rt, Math.PI / 2, Math.PI, false);
+      s.lineTo(x0, y0 + rb);
+      s.absarc(x0 + rb, y0 + rb, rb, Math.PI, Math.PI * 1.5, false);
+      return s;
+    }
+    const backGroup = new THREE.Group();
+    backGroup.position.set(0, 45 + backH / 2, -21);
+    backGroup.rotation.x = -0.12;
+    chair.add(backGroup);
+
+    const meshTex = makeChairMeshTexture();
+    meshTex.repeat.set(0.3, 0.3);
+    const meshMat = new THREE.MeshStandardMaterial({
+      map: meshTex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide,
+      roughness: 0.85, metalness: 0.05
     });
+    // 人體工學弧度：左右包覆（兩側前彎）+ 腰部位置前凸
+    function bendBack(geo) {
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        pos.setZ(i, z + 0.0075 * x * x + 1.7 * Math.exp(-Math.pow((y + 8) / 13, 2)));
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+    }
+
+    const innerShape = backShape(backW - 2 * frameW, backH - 2 * frameW, rTop - frameW, rBot - frameW);
+    const meshPanel = new THREE.Mesh(new THREE.ShapeGeometry(innerShape, 24), meshMat);
+    bendBack(meshPanel.geometry);
+    meshPanel.castShadow = true; meshPanel.receiveShadow = true;
+    backGroup.add(meshPanel);
+
+    // 外框（同一輪廓挖空）
+    const frameMat = SM(0x1b2026, 0.55, 0.25);
+    const outerShape = backShape(backW, backH, rTop, rBot);
+    outerShape.holes.push(backShape(backW - 2 * frameW, backH - 2 * frameW, rTop - frameW, rBot - frameW));
+    const frameGeo = new THREE.ExtrudeGeometry(outerShape, {depth: frameD, bevelEnabled: false, curveSegments: 24});
+    frameGeo.translate(0, 0, -frameD / 2);
+    bendBack(frameGeo);
+    const backFrame = new THREE.Mesh(frameGeo, frameMat);
+    backFrame.castShadow = true; backFrame.receiveShadow = true;
+    backGroup.add(backFrame);
     // 椅背支架
     const stem2 = new THREE.Mesh(new THREE.BoxGeometry(4, 16, 4), metal);
     stem2.position.set(0, 53, -20); stem2.castShadow = true; chair.add(stem2);
@@ -7463,7 +7653,7 @@ function build() {
   const kbTopMat = new THREE.MeshStandardMaterial({map: kbTexture, roughness: 0.9});
   const kbBodyMat = SM(0x151515, 0.85);
   const kbW = 45, kbH = 2, kbD = 15;
-  const kbX = 10, kbZ = 94;
+  const kbX = 17, kbZ = 92;                     // 對齊顯示器（monitorX = 17）
   const keyboardMats = [kbBodyMat, kbBodyMat, kbTopMat, kbBodyMat, kbBodyMat, kbBodyMat];
   const keyboard = new THREE.Mesh(new THREE.BoxGeometry(kbW, kbH, kbD), keyboardMats);
   keyboard.position.set(kbX, deskH + kbH / 2, kbZ);
@@ -7473,7 +7663,7 @@ function build() {
 
   const padMat = SM(0x2f6fd0, 0.95);
   const padEdgeMat = SM(0x1c4a94, 0.95);
-  const padW = 20, padD = 20, padX = -14, padZ = 94;
+  const padW = 20, padD = 20, padX = -16, padZ = 92;   // 鍵盤右側（面向書桌時的右手邊），不與鍵盤重疊
   const padEdge = new THREE.Mesh(new THREE.BoxGeometry(padW, 0.2, padD), padEdgeMat);
   padEdge.position.set(padX, deskH + 0.1, padZ);
   padEdge.receiveShadow = true;
@@ -7714,10 +7904,13 @@ function tryToggleDoors(clientX, clientY) {
   else if (tag === 'wardDoor') {
     const idx = obj.userData.wardDoorIdx;
     wardDoorStates[idx] = !wardDoorStates[idx];
+  } else if (tag === 'wardDrawer') {
+    wardDrawerOpen = !wardDrawerOpen;
   } else if (tag === 'bedDrawer') {
     const idx = obj.userData.bedDrawerIdx;
     if (bedDrawers[idx]) bedDrawers[idx].open = !bedDrawers[idx].open;
-  } else if (tag === 'bedTopDoor') bedTopDoorOpen = !bedTopDoorOpen;
+  } else if (tag === 'bedLidA') bedLidAOpen = !bedLidAOpen;
+  else if (tag === 'bedLidB') bedLidBOpen = !bedLidBOpen;
   else if (tag === 'bedTopDoorR') bedTopDoorROpen = !bedTopDoorROpen;
   else if (tag === 'bcWoodDoor') bcWoodDoorOpen = !bcWoodDoorOpen;
   else if (tag === 'bcGlassL') bcGlassLOpen = !bcGlassLOpen;
@@ -7755,22 +7948,31 @@ function animate() {
     storageDrawerPivot.position.z += (targetZ - storageDrawerPivot.position.z) * 0.14;
   }
   wardDoorPivots.forEach((pivot, i) => {
-    const target = wardDoorStates[i] ? Math.PI / 2 : 0;
+    // 鉸鏈已改到靠床一側，開門方向相反；開到 86° 以免門板貼平床尾
+    const target = wardDoorStates[i] ? -Math.PI * 0.48 : 0;
     pivot.rotation.y += (target - pivot.rotation.y) * 0.14;
   });
+  if (wardDrawerPivot) {
+    const targetX = wardDrawerOpen ? wardDrawerClosedX - 40 : wardDrawerClosedX;
+    wardDrawerPivot.position.x += (targetX - wardDrawerPivot.position.x) * 0.14;
+  }
   bedDrawers.forEach(d => {
     const targetZ = d.open ? d.closedZ + d.travel : d.closedZ;
     d.pivot.position.z += (targetZ - d.pivot.position.z) * 0.14;
   });
-  if (bedTopDoorPivot) {
-    const target = bedTopDoorOpen ? -Math.PI * 0.42 : 0;
-    bedTopDoorPivot.rotation.x += (target - bedTopDoorPivot.rotation.x) * 0.14;
+  if (bedLidAPivot) {
+    const target = bedLidAOpen ? -Math.PI * 0.42 : 0;
+    bedLidAPivot.rotation.x += (target - bedLidAPivot.rotation.x) * 0.14;
+  }
+  if (bedLidBPivot) {
+    const target = bedLidBOpen ? -Math.PI * 0.42 : 0;
+    bedLidBPivot.rotation.x += (target - bedLidBPivot.rotation.x) * 0.14;
   }
   if (bedTopDoorRPivot) {
     const target = bedTopDoorROpen ? -Math.PI * 0.42 : 0;
     bedTopDoorRPivot.rotation.x += (target - bedTopDoorRPivot.rotation.x) * 0.14;
   }
-  const bedOpen = bedTopDoorOpen || bedTopDoorROpen;
+  const bedOpen = bedLidAOpen || bedLidBOpen || bedTopDoorROpen;
   if (bedMattressMesh) bedMattressMesh.visible = otherVisible && !bedOpen;
   if (bedPillowMesh) bedPillowMesh.visible = otherVisible && !bedOpen;
   if (bcWoodDoorPivot) {
